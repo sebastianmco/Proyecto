@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Users Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Barlow+Condensed:wght@300;600;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0e11;
+      --surface:  #161820;
+      --border:   #2a2d38;
+      --accent:   #e8ff47;
+      --accent2:  #ff5c35;
+      --text:     #e8eaf0;
+      --muted:    #5a5f72;
+      --mono:     'Space Mono', monospace;
+      --display:  'Barlow Condensed', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    /* ── noise overlay ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ── layout ── */
+    .shell {
+      position: relative; z-index: 1;
+      max-width: 1060px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ── header ── */
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding: 40px 0 28px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 36px;
+    }
+
+    .logo {
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: 48px;
+      line-height: 1;
+      letter-spacing: -1px;
+      text-transform: uppercase;
+    }
+    .logo span { color: var(--accent); }
+
+    .tagline {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* ── toast ── */
+    #toast {
+      position: fixed; top: 24px; right: 24px; z-index: 999;
+      padding: 12px 20px;
+      font-family: var(--mono); font-size: 12px;
+      border-left: 3px solid var(--accent);
+      background: var(--surface);
+      transform: translateY(-120%);
+      transition: transform .3s cubic-bezier(.22,1,.36,1);
+    }
+    #toast.show { transform: translateY(0); }
+    #toast.err  { border-color: var(--accent2); }
+
+    /* ── grid layout ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 24px;
+    }
+
+    /* ── panel ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 28px;
+    }
+
+    .panel-title {
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    /* ── form ── */
+    label {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input[type=text], input[type=email] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 10px 14px;
+      outline: none;
+      margin-bottom: 18px;
+      transition: border-color .2s;
+    }
+    input:focus { border-color: var(--accent); }
+
+    .btn-row {
+      display: flex; gap: 10px; margin-top: 4px;
+    }
+
+    button {
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 10px 22px;
+      border: none;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    button:active { transform: scale(.97); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0d0e11;
+      flex: 1;
+    }
+    .btn-secondary {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+
+    /* ── mode indicator ── */
+    #mode-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      margin-bottom: 20px;
+    }
+    #mode-badge.edit { border-color: var(--accent2); color: var(--accent2); }
+
+    /* ── table ── */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+
+    .stat {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .stat-num {
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: 36px;
+      line-height: 1;
+      color: var(--accent);
+    }
+    .stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead tr {
+      border-bottom: 2px solid var(--accent);
+    }
+    th {
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: left;
+      padding: 10px 12px;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    tbody tr:hover { background: rgba(232,255,71,.03); }
+
+    td {
+      padding: 13px 12px;
+      font-size: 13px;
+    }
+    td.id-col {
+      color: var(--muted);
+      font-size: 11px;
+      width: 50px;
+    }
+
+    .actions { display: flex; gap: 8px; }
+    .btn-edit, .btn-del {
+      padding: 5px 14px;
+      font-size: 10px;
+      letter-spacing: 1.5px;
+    }
+    .btn-edit {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+    .btn-edit:hover { background: var(--accent); color: #0d0e11; }
+    .btn-del {
+      background: transparent;
+      color: var(--accent2);
+      border: 1px solid var(--accent2);
+    }
+    .btn-del:hover { background: var(--accent2); color: #fff; }
+
+    /* ── empty state ── */
+    .empty {
+      text-align: center;
+      padding: 60px 0;
+      color: var(--muted);
+    }
+    .empty-icon {
+      font-family: var(--display);
+      font-size: 72px;
+      font-weight: 800;
+      opacity: .12;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    /* ── loading ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── search ── */
+    .search-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .search-row input {
+      margin-bottom: 0;
+      flex: 1;
+    }
+
+    /* ── responsive ── */
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+      .logo { font-size: 36px; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div>
+      <div class="logo">Users<span>.</span>Manager</div>
+    </div>
+    <div class="tagline">PostgreSQL · Node.js · REST API</div>
+  </header>
+
+  <div id="toast"></div>
+
+  <div class="grid">
+    <!-- ── Form Panel ── -->
+    <aside class="panel">
+      <div class="panel-title">Gestión de usuario</div>
+      <div id="mode-badge">+ Nuevo</div>
+
+      <label for="inp-name">Nombre</label>
+      <input type="text" id="inp-name" placeholder="John Doe" autocomplete="off" />
+
+      <label for="inp-email">Email</label>
+      <input type="email" id="inp-email" placeholder="john@example.com" autocomplete="off" />
+
+      <div class="btn-row">
+        <button class="btn-primary" id="btn-submit" onclick="submitForm()">Guardar</button>
+        <button class="btn-secondary" id="btn-cancel" onclick="cancelEdit()" style="display:none">Cancelar</button>
+      </div>
+    </aside>
+
+    <!-- ── Table Panel ── -->
+    <main class="panel">
+      <div class="panel-title">Usuarios registrados</div>
+
+      <div class="stats-row">
+        <div class="stat">
+          <span class="stat-num" id="stat-count">0</span>
+          <span class="stat-label">usuarios</span>
+        </div>
+      </div>
+
+      <div class="search-row">
+        <input type="text" id="search" placeholder="Buscar por nombre o email..." oninput="renderTable()" />
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Email</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div id="empty-state" class="empty" style="display:none">
+          <span class="empty-icon">∅</span>
+          No hay usuarios. Crea el primero.
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  // ── Config ──────────────────────────────────────────────
+  const API = (window.API_BASE_URL || 'http://localhost:3000') + '/api';
+
+  // ── State ───────────────────────────────────────────────
+  let users = [];
+  let editId = null;
+
+  // ── Toast ───────────────────────────────────────────────
+  function toast(msg, err = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show' + (err ? ' err' : '');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.className = '', 2800);
+  }
+
+  // ── API calls ───────────────────────────────────────────
+  async function fetchUsers() {
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '<tr><td colspan="4"><span class="spinner"></span>Cargando...</td></tr>';
+    try {
+      const r = await fetch(`${API}/users`);
+      if (!r.ok) throw new Error(r.statusText);
+      users = await r.json();
+      document.getElementById('stat-count').textContent = users.length;
+      renderTable();
+    } catch (e) {
+      toast('Error al cargar usuarios: ' + e.message, true);
+      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--accent2)">Error de conexión con el servidor.</td></tr>';
+    }
+  }
+
+  async function createUser(name, email) {
+    const r = await fetch(`${API}/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email })
+    });
+    if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+    return r.json();
+  }
+
+  async function updateUser(id, name, email) {
+    const r = await fetch(`${API}/users/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email })
+    });
+    if (!r.ok) throw new Error(r.statusText);
+    return r.json();
+  }
+
+  async function deleteUser(id) {
+    const r = await fetch(`${API}/users/${id}`, { method: 'DELETE' });
+    if (!r.ok && r.status !== 204) throw new Error(r.statusText);
+  }
+
+  // ── Render ──────────────────────────────────────────────
+  function renderTable() {
+    const q = document.getElementById('search').value.toLowerCase();
+    const filtered = users.filter(u =>
+      u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+    );
+
+    const tbody = document.getElementById('tbody');
+    const empty = document.getElementById('empty-state');
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+    } else {
+      empty.style.display = 'none';
+      tbody.innerHTML = filtered.map(u => `
+        <tr id="row-${u.id}">
+          <td class="id-col">#${u.id}</td>
+          <td>${escHtml(u.name)}</td>
+          <td>${escHtml(u.email)}</td>
+          <td class="actions">
+            <button class="btn-edit" onclick="startEdit(${u.id}, '${escAttr(u.name)}', '${escAttr(u.email)}')">Editar</button>
+            <button class="btn-del" onclick="confirmDelete(${u.id})">Eliminar</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+    document.getElementById('stat-count').textContent = users.length;
+  }
+
+  // ── Form logic ──────────────────────────────────────────
+  async function submitForm() {
+    const name  = document.getElementById('inp-name').value.trim();
+    const email = document.getElementById('inp-email').value.trim();
+    if (!name || !email) { toast('Nombre y email son requeridos.', true); return; }
+
+    const btn = document.getElementById('btn-submit');
+    btn.textContent = 'Guardando...';
+    btn.disabled = true;
+
+    try {
+      if (editId !== null) {
+        await updateUser(editId, name, email);
+        toast(`Usuario #${editId} actualizado.`);
+      } else {
+        await createUser(name, email);
+        toast('Usuario creado correctamente.');
+      }
+      cancelEdit();
+      await fetchUsers();
+    } catch (e) {
+      toast('Error: ' + e.message, true);
+    } finally {
+      btn.textContent = 'Guardar';
+      btn.disabled = false;
+    }
+  }
+
+  function startEdit(id, name, email) {
+    editId = id;
+    document.getElementById('inp-name').value  = name;
+    document.getElementById('inp-email').value = email;
+    const badge = document.getElementById('mode-badge');
+    badge.textContent = `✎ Editando #${id}`;
+    badge.className = 'edit';
+    document.getElementById('btn-cancel').style.display = '';
+    document.getElementById('inp-name').focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function cancelEdit() {
+    editId = null;
+    document.getElementById('inp-name').value  = '';
+    document.getElementById('inp-email').value = '';
+    const badge = document.getElementById('mode-badge');
+    badge.textContent = '+ Nuevo';
+    badge.className = '';
+    document.getElementById('btn-cancel').style.display = 'none';
+  }
+
+  async function confirmDelete(id) {
+    if (!confirm(`¿Eliminar usuario #${id}?`)) return;
+    try {
+      await deleteUser(id);
+      toast(`Usuario #${id} eliminado.`);
+      await fetchUsers();
+    } catch (e) {
+      toast('Error al eliminar: ' + e.message, true);
+    }
+  }
+
+  // ── Utils ───────────────────────────────────────────────
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function escAttr(s) {
+    return s.replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+  }
+
+  // ── Init ─────────────────────────────────────────────────
+  fetchUsers();
+</script>
+</body>
+</html>
