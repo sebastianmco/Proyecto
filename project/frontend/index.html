@@ -393,21 +393,23 @@
   }
 
   // ── API calls ───────────────────────────────────────────
-  async function fetchUsers() {
-    const tbody = document.getElementById('tbody');
-    tbody.innerHTML = '<tr><td colspan="4"><span class="spinner"></span>Cargando...</td></tr>';
-    try {
-      const r = await fetch(`${API}/users`);
-      if (!r.ok) throw new Error(r.statusText);
-      users = await r.json();
-      document.getElementById('stat-count').textContent = users.length;
-      renderTable();
-    } catch (e) {
-      toast('Error al cargar usuarios: ' + e.message, true);
-      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--accent2)">Error de conexión con el servidor.</td></tr>';
-    }
+async function fetchUsers() {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '<tr><td colspan="4"><span class="spinner"></span>Conectando con servidor...</td></tr>';
+  try {
+    await fetch(`${BACKEND_URL}/health`).catch(() => {});
+    await new Promise(r => setTimeout(r, 3000));
+    const r = await fetch(`${API}/users`);
+    if (!r.ok) throw new Error(r.statusText);
+    users = await r.json();
+    document.getElementById('stat-count').textContent = users.length;
+    renderTable();
+  } catch (e) {
+    toast('Error al cargar usuarios: ' + e.message, true);
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--accent2)">Error de conexión con el servidor.</td></tr>';
   }
-
+}
+  
   async function createUser(name, email) {
     const r = await fetch(`${API}/users`, {
       method: 'POST',
